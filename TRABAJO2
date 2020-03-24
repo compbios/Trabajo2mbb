@@ -1,0 +1,226 @@
+# TRABAJO 2
+# MÓNICA BOTERO BERMUDEZ
+
+
+
+#fijar la dirección de trabajo, la carpeta donde estan las bases de datos
+setwd("C:/Users/monic/Documents/Maestría en epidemiología/Computación/Trabajo 2/datos_tp2")
+#observo que archivos encuentra en dicha carpeta
+list.files()
+#leer el archivo de STATA
+library ("haven")
+datos1stata<- read_dta("datacad.dta")
+#leer el archivo de Excel 2007
+library(readxl)
+datos2excel<- read_excel("departamentos.xlsx")
+#leo el archivo cerrado por comas
+datos3comas<- read.csv ("ies.csv")
+#leo el archivo de Stata 12
+datos4stata<- read_dta("infocont.dta")
+#leo el archivo de SPSS
+install.packages("foreign")
+library("foreign")
+datos5spss<- read.spss ("infoies.sav",use.value.labels=TRUE, max.value.labels=TRUE, to.data.frame=TRUE)
+#leo el archivo de trabajo de R 
+datos6r<- load("infoper.Rdata")
+na.omit(datos6r)
+#leo el segundo archivo de spss
+datos7spss<- read.spss ("infosocio.sav", use.value.labels=TRUE, max.value.labels=TRUE, to.data.frame=TRUE)
+#leo el segundo archivo de excel
+datos8excel<- read_excel ("municipios.xlsx")
+#leo el archivo separado por comas
+datos9comas<- read.csv ("punglo.csv")
+#leo el segundo archivo de R
+datos10r<- load("punmod_pre.Rdata")
+
+#Punto 2: uno las tablas punmoda y punmodb
+punmod<- merge (punmoda, punmodb, by= c("ESTU_ID"), all= TRUE)
+#Punto 3: uno las tablas de infocod, con municipio y departamento (solo unir lo que tenga espejo  en datos4stata)
+#para unir por el código del departamento y municipio me aseguro que tengan los mismos nombres de las columnas
+names (datos4stata) [2] <- "CODIGO_DEP"
+names (datos4stata) [3] <- "CODIGO_MUN"
+uniondepartamentos<- merge (datos4stata, datos2excel, by= c("CODIGO_DEP"), all.x=TRUE)
+ubicacion <- merge (uniondepartamentos, datos8excel, by= c ("CODIGO_MUN"), all.x=TRUE)
+#Reorganizo el orden de las columnas para que sea más ordenado
+ubicacion<- ubicacion [ ,c (3,2,5,1,6,4)]
+#punto 4A: Describo los estudiantes que presentaron la prueba (tabla infoper)
+#cuantos estudiantes presentaron la prueba SaberPro?
+attach (infoper)
+str (ESTU_ID)
+#RTA: 242.629 estudiantes presentaron la prueba saberpro
+#Punto 4B: Cuántos son hombres y cuántos mujeres?
+table (ESTU_GENERO)
+#RTA: de los 242.629 estudiantes, 143.451 son mujeres y 99.178 son hombres
+#Punto 4C: Describa la edad de los pacientes al momento de la prueba (presentada el 24 de diciembre de 2015)
+fechadeprueba<- as.Date ("24/12/2015", format= "%d/%m/%Y")
+class (ESTU_FECHANACIMIENTO)
+fechadenacimiento<- as.Date (ESTU_FECHANACIMIENTO, format= "%d/%m/%Y")
+edadenlaprueba<- fechadeprueba- fechadenacimiento
+edad<- data.frame (fechadenacimiento, edadenlaprueba)
+#hay datos probablemente mal ingresados en la tabla entonces restringiré las edades desde los que nacieron desde 1933 (porque no considero viable que una persona de más de 90 años haya tomado la prueba) hasta el 2005 para que el participante tenga una edad aparentemente lógica mínima de presentar la prueba (10 años, asumiendo que existen super dotados adelantados en curso etc)
+#borro primero los datos que son nulos NA
+edad<- na.omit (edad)
+edadfiltrada<- edad [edad$fechadenacimiento >= "1933-02-03" & edad$fechadenacimiento <="2005-01-01",]
+#busco ahora reportar la edad en años y no en días como esta actualmente rerportada la "edadenlaprueba"
+names (edadfiltrada) [2]<- "edad en días"
+attach (edadfiltrada)
+#pido que me de los datos sin decimales solo en números enteros
+edadfiltrada$edadenaños <- trunc (`edad en días`/365)
+#RTA: Describo la edad de los pacientes al momento de la prueba:
+min (edadenaños)
+#Los participantes que tenían menos años tuvieron 11 años
+max (edadenaños)
+#Los estudiantes que tenían mayor año en el momento de la prueba tenían 82
+median (edadenaños)
+#la mediana para la edad en años al presentar la prueba es de 23 años
+#la frecuencia de cada una de las edades fue:
+ed<- table (edadenaños)
+resumenfrecuencias<- data.frame (ed)
+print (resumenfrecuencias)
+
+#Punto 4D: cuántos estudiantes pertenecen a un grupo étnico? 
+table (ESTU_TIENEETNIA)
+#Respuesta: 13.805 estudiantes pertenecen a un grupo étnico
+#Cuáles son los grupos étnicos más y menos frecuentes?
+sort (table (ESTU_ETNIA))
+#las etnias más frecuentes son la comunidad afrodescendiente,  grupo étnicom minoritario y zen/Xfa
+#las etnias menos frecuentes son la comunidad x, comunidad rom (gitana), cubeo y sikuani
+#también lo puedo encontrar así:
+names (sort (table (ESTU_ETNIA)))
+# Punto 4E Describa las condiciones de discapacidad reportadas por los estudiantes al momento de la inscripción de la prueba
+#creo un data frame para discapcidad incluyendo género y el ID
+library (dplyr)
+idest<- infoper [,"ESTU_ID"]
+genero<- infoper [, "ESTU_GENERO"]
+autismo <- infoper [, "ESTU_LIMITA_AUTISMO"]
+sordera<- infoper [, "ESTU_LIMITA_SORDO"]
+otra <- infoper [,"ESTU_LIMITA_CONDICIONESPECIAL"]
+ciego<- infoper [,"ESTU_LIMITA_INVIDENTE"]
+discmot<- infoper [,"ESTU_LIMITA_MOTRIZ"]
+discapacidad <- data.frame (idest, genero, autismo, sordera, otra, ciego, discmot)
+#reemplazo los valores de NA por 0 y de x por 1 
+discapacidad [is.na(discapacidad)] <-0
+discapacidad [discapacidad=="x"] <- 1
+#convierto los caracteres a factores para poder calcular frecuencias absolutas
+aut<- factor (discapacidad$ESTU_LIMITA_AUTISMO)
+sord<- factor (discapacidad$ESTU_LIMITA_SORDO)
+ot<- factor (discapacidad$ESTU_LIMITA_CONDICIONESPECIAL)
+ceg<- factor (discapacidad$ESTU_LIMITA_INVIDENTE)
+mot<- factor (discapacidad$ESTU_LIMITA_MOTRIZ)
+gen<- factor (discapacidad$ESTU_GENERO)
+
+discap<- data.frame (idest, gen, aut, sord, ot, ceg, mot)
+summary (discap)
+xtabs (~aut + gen + sord + ot + ceg + mot, data=discap)
+table (gen,aut)
+xtabs (~sord + gen + aut + ot + ceg + mot, data=discap)
+table (gen,sord)
+xtabs (~ot + gen + aut + sord + ceg + mot, data=discap)
+table (gen, ot)
+xtabs (~ceg + gen + aut + ot + sord + mot, data=discap)
+table (gen,ceg)
+xtabs (~mot + gen + aut + ot + ceg + sord, data=discap)
+table (gen, mot)
+#RTA: Entre las personas que presentaron la prueba existen 4 personas con autismo, 67 personas sordas, 63 personas invidentes, 243 personas con discapacidad motora y 10 personas clasificadas con otro tipo de discapacidad
+#Entre las personas autistas hay 2 hombres y 2 mujeres y 1 de ellas es una mujer que padece adicionalmente otra "condición especial"
+#Entre las personas sordas hay  29 mujeres y 38 hombres, adicionalmente 2 de dichos hombres sordos son adicionalmente invidentes y 1 hombre tiene una discapacidad motora
+#Entre las personas con una condición especial hay 5 hombres y 5 mujeres, entre estos, 2 mujeres tienen adicionalmente una discapacidad motora y 4 hombres tienen una discapacidad motora, también, tres personas sufren concomitantemente de ceguera (2 mujeres y 1 hombre) y 1 mujer sufre de autismo
+#Entre las personas invidentes 25 son mujeres y 38 hombres. Las personas invidentes sufren concomitantemente: 3 de ellos discapacidad motora, 2 de ellos sordera y 3 alguna condición especial adicional
+#Entre las personas con discapacidad motora 101 son mujeres y 142 son hombres. 1 de estas personas sufre concomitantemente de sordera y  3 son invidentes. 
+
+#Punto 5: cuales son las 5 instituciones de educación superior  con más estudiantes
+#uno las dos tablas de spss y la separada por comas para tener el nombre de la IES
+IES<- merge (datos5spss, datos3comas, by= c("INST_COD_INSTITUCION"), all.x= TRUE)
+#Uno los datos de la tabla infoper para obtener el género de los estudiantes
+generoyid<- data.frame (infoper$ESTU_ID, infoper$ESTU_GENERO)
+#cambio el nombre de la columna para poder hacer merge
+names (generoyid) [1] <- "ESTU_ID"
+InES<- merge (IES, generoyid, by= c("ESTU_ID"), all=TRUE)
+InES<- tbl_df (InES)
+attach (InES)
+#En cundinamarca (nombre,#deestudiantes, género de dichos estudiantes)
+library (dplyr)
+cundi<- filter (InES, ESTU_PRGM_CODDEPARTAMENTO == "CUNDINAMARCA   ")
+CUN<-  factor (cundi$INST_NOMBRE_INSTITUCION)
+tail (sort (table (CUN)))
+#RTA: las 5 instituciones en las que se ofrecen y matriculan más estudiantes en Cundinamarca son
+#1)la universidad de la sabana 
+#2)la universidad de cundinamarca-UDEC de fusagasuga
+#3)la universidad de tolima con 
+#4) la universidad de cundinamarca UDEC 
+#5) la universidad militar
+#sin embargo se considera podría ser un error de la base de datos incluir universidades de otro departamento
+sort (table (CUN))
+CUUN<-  factor (cundi$infoper.ESTU_GENERO) 
+ctab<- data.frame (CUN,CUUN)
+c<- xtabs (~CUUN + CUN, data=ctab)
+c
+#RTA: 
+#1) Universidad  de la sabana con 817 mujeres y 471 hombres
+#2) UDEC de fusagasuga con 640 mujeres y 601 hombres
+#3) universidad de Cundinamarca -UDEC- Girardot con 204 mujeres y 127 hombres
+#4)corporación piloto de colombia giradot  que tiene 117 mujeres y 133 hombres
+#5) universidad de cundinamarca udec de ubate que tiene 31 mujeres y 19 hombres
+#serían las 5 principales instituciones realmente en Cundinamarca
+
+
+#En Antioquia (nombre,#deestudiantes, género de dichos estudiantes)
+antio <- filter (InES, ESTU_PRGM_CODDEPARTAMENTO == "ANTIOQUIA      ")
+ANT <- factor (antio$INST_NOMBRE_INSTITUCION)
+tail (sort (table (ANT)))
+GANT <-factor (antio$infoper.ESTU_GENERO)
+atab<- data.frame (ANT, GANT)
+a<- xtabs (~GANT + ANT, data=atab)
+a
+#las 5 universidades donde se matricula más gente en antioquia son
+#1) La La universidad de antioqcorporación universitaria Remington con 2491 mujeres y 1562 hombres
+#2) La universidad de antioquia de Medellin  con 2139 mujeres y 1874 hombres
+#3) Universidad pontificia bolivariana de medellin con 1153 mujeres y 728 hombres
+#4) La universidad de Medellín  con 954 mujeres y 701 hombres 
+#5) La fundación universitaria luis amigo funlam de medellín con 2268 mujeres y 470 hombres
+
+
+#En Santander (nombre,#deestudiantes, género de dichos estudiantes)
+sant<- filter (InES, ESTU_PRGM_CODDEPARTAMENTO == "SANTANDER      ")
+SAN <- factor (sant$INST_NOMBRE_INSTITUCION)
+tail (sort (table (SAN)))
+GSAN <-factor (sant$infoper.ESTU_GENERO)
+stab<- data.frame (SAN, GSAN)
+s<- xtabs (~GSAN + SAN, data=stab)
+s
+
+#las 5 universidades donde se matricula más gente en Santander son
+#1)La universidad industrial de Santander con 1065 mujeres y 1079 hombres
+#2) Unidades tecnológicas de santander con 694 mujeres y 468 hombres
+#3) Universidad de santo tomas con 534 mujeres y 394 hombres
+#4) Universidad pontificia bolivariana con 499 mujeres y 427 hombres
+#5) Corporacion universitaria de investigacion y desarrollo UDI con 528 mujeres y 387 hombres#3) La universidad pontificia bolivariana con 1153 mujeres y 728 hombres
+
+
+
+
+
+#EN Bogotá (nombre,#deestudiantes, género de dichos estudiantes)
+bog <- filter (InES, ESTU_PRGM_CODDEPARTAMENTO == "BOGOTA         ")
+
+BO<- factor (bog$INST_NOMBRE_INSTITUCION)
+tail (sort (table (BO)))
+GBOG <-factor (bog$infoper.ESTU_GENERO)
+btab<- data.frame (BO, GBOG)
+b<- xtabs (~GBOG + BO, data=btab)
+b
+
+#las 5 universidades donde se matricula más gente en Bogotá
+#1)La corporación universitaria minuto de dios con 9920 mujeres y 2816 hombres
+#2) La universidad nacional abierta y adistancia UNAD con 3938 mujeres y 2747 hombres
+#3) El politécnico grancolombiano con 3902 mujeres y 2254 hombres
+#4)La universidad nacional de colombia con 1418 mujeres y 2342 hombres
+#5) La pontificia universidad javeriana con 1815 mujeres y 1262 hombres
+
+
+
+
+
+
+#Punto 6: describa por sexo la manera de preparación al examen reportada por los estudiantes
+prep<- merge (datos1stata, generoyid, by= c("ESTU_ID"), all.x= TRUE)
